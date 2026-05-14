@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Student Access</title>
+<title>Lecturer Access</title>
 
 <style>
   body {
@@ -51,9 +51,9 @@
 <body>
 
 <div class="box">
-  <h2>Enter Student ID</h2>
+  <h2>Lecturer Access</h2>
 
-  <input type="text" id="studentId" placeholder="Enter 5-digit ID" maxlength="6">
+  <input type="text" id="lecturerId" placeholder="Enter Lecturer ID (4-12 letters/numbers)" maxlength="12">
 
   <button onclick="submitData()">Submit</button>
 
@@ -61,41 +61,75 @@
 </div>
 
 <script>
+// Key prefix for localStorage (separate from student records)
+const STORAGE_PREFIX = "lecturer_submit_";
+
+function getLastSubmitTime(lecturerId) {
+  const key = STORAGE_PREFIX + lecturerId;
+  const stored = localStorage.getItem(key);
+  if (!stored) return null;
+  return parseInt(stored, 10);
+}
+
+function setLastSubmitTime(lecturerId) {
+  const key = STORAGE_PREFIX + lecturerId;
+  localStorage.setItem(key, Date.now());
+}
+
+function isWithin24Hours(lastTime) {
+  if (!lastTime) return false;
+  const now = Date.now();
+  const hoursDiff = (now - lastTime) / (1000 * 60 * 60);
+  return hoursDiff < 24;
+}
+
 function submitData() {
-  let id = document.getElementById("studentId").value.trim();
+  let id = document.getElementById("lecturerId").value.trim();
   let errorMsg = document.getElementById("errorMsg");
 
-  // Validate 6-digit ID
-  let pattern = /^[0-9]{6}$/;
-
+  // Validate Lecturer ID: alphanumeric, 4-12 characters (adjust as needed)
+  let pattern = /^[A-Za-z0-9]{4,12}$/;
   if (!pattern.test(id)) {
-    errorMsg.innerText = "Enter a valid 5-digit ID";
+    errorMsg.innerText = "Enter a valid Lecturer ID (4-12 letters/numbers, no spaces)";
+    errorMsg.style.color = "red";
+    return;
+  }
+
+  // Check 24-hour limit
+  const lastSubmit = getLastSubmitTime(id);
+  if (isWithin24Hours(lastSubmit)) {
+    const hoursRemaining = 24 - ((Date.now() - lastSubmit) / (1000 * 60 * 60));
+    const hoursInt = Math.ceil(hoursRemaining);
+    errorMsg.innerText = `This ID has already been used recently. Please wait ${hoursInt} hour(s) before submitting again.`;
+    errorMsg.style.color = "red";
     return;
   }
 
   errorMsg.innerText = "";
 
-  // Send to Formspree
-  fetch("https://formspree.io/f/mojrrnoq", {
+  // Send to Formspree (using same endpoint; change if needed)
+  let formData = new FormData();
+  formData.append("lecturer_id", id);
+  formData.append("submitted_at", new Date().toLocaleString());
+
+  fetch("https://formspree.io/f/xzzekvlr", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      student_id: id,
-      submitted_at: new Date().toLocaleString()
-    })
+    body: formData
   })
   .then(response => {
     if (response.ok) {
-      // Redirect after successful submission
-     window.location.href = "https://AmineJalloh-io.github.io/lecturer_form/?lecturer_id=" + id;
+      // Record successful submission timestamp
+      setLastSubmitTime(id);
+      // Redirect to lecturer dashboard (adjust URL as needed)
+      window.location.href = "https://AmineJalloh-io.github.io/lecturer_dashboard/?lecturer_id=" + id;
     } else {
-      errorMsg.innerText = "Submission failed. Try again.";
+      errorMsg.innerText = `Submission failed (status ${response.status}). Try again.`;
+      errorMsg.style.color = "red";
     }
   })
   .catch(error => {
-    errorMsg.innerText = "Network error.";
+    errorMsg.innerText = "Network error: " + error.message;
+    errorMsg.style.color = "red";
   });
 }
 </script>
